@@ -16,6 +16,7 @@ if (!admin.apps.length) {
         
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id,
         });
         
         console.log("Firebase Admin initialized successfully with environment variable");
@@ -35,6 +36,7 @@ if (!admin.apps.length) {
         
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id,
         });
         
         console.log("Firebase Admin initialized successfully with JSON file");
