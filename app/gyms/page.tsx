@@ -6,9 +6,10 @@ import { useFirebase } from "@/hooks/useFirebase"
 import { useRouter } from "next/navigation"
 import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from "firebase/auth"
 import Sidebar from "@/components/Sidebar"
 import type { Gym } from "@/lib/types"
-import { Edit, Trash2, Plus, MapPin, Phone, Mail, Dumbbell, X, Upload, Camera, Download, QrCode } from "lucide-react"
+import { Edit, Trash2, Plus, MapPin, Phone, Mail, Dumbbell, X, Upload, Camera, Download, QrCode, Clipboard, Key } from "lucide-react"
 import Image from "next/image"
 import { Skeleton } from "@/components/ui/skeleton"
 import QRCode from "qrcode"
@@ -67,6 +68,8 @@ export default function Gyms() {
   const [uploadingEditImage1, setUploadingEditImage1] = useState(false)
   const [uploadingEditImage2, setUploadingEditImage2] = useState(false)
   const [generatingQR, setGeneratingQR] = useState(false)
+  const [gymCredentials, setGymCredentials] = useState<{ email: string; password: string; gymName: string } | null>(null)
+  const [resettingPassword, setResettingPassword] = useState<string | null>(null)
 
   useEffect(() => {
     if (initialized && !authLoading && !user) {
@@ -142,10 +145,29 @@ export default function Gyms() {
 
   const handleAddGym = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!firebase?.db) return
+    if (!firebase?.db || !firebase?.auth) return
     
     setCreatingGym(true)
     try {
+      // Generate random password for the gym user
+      const password = generateRandomPassword()
+      
+      // Create Firebase Auth user
+      let authUser = null
+      try {
+        authUser = await createUserWithEmailAndPassword(firebase.auth, newGym.email, password)
+        console.log("Firebase Auth user created successfully:", authUser.user.uid)
+      } catch (authError: any) {
+        console.error("Error creating Firebase Auth user:", authError)
+        if (authError.code === 'auth/email-already-in-use') {
+          alert("A user with this email already exists. Please use a different email.")
+          return
+        } else {
+          alert("Failed to create user account. Please try again.")
+          return
+        }
+      }
+      
       const gymData = {
         ...newGym,
         createdAt: new Date(),
@@ -174,6 +196,18 @@ export default function Gyms() {
       
       setGyms([...gyms, newGymWithId])
       setShowAddModal(false)
+      
+      // Set credentials and show QR modal with credentials
+      setGymCredentials({
+        email: newGym.email,
+        password: password,
+        gymName: newGym.name
+      })
+      
+      // Show credentials modal for the newly created gym
+      setCurrentGymName(newGym.name)
+      setShowQRModal(true)
+      
       setNewGym({
         name: "",
         address: "",
@@ -210,8 +244,6 @@ export default function Gyms() {
         }
       })
       
-      // Show success message with QR code info
-      alert(`Gym "${newGymWithId.name}" created successfully! QR code has been generated and saved.`)
     } catch (error) {
       console.error("Error adding gym:", error)
       alert("Failed to add gym. Please try again.")
@@ -370,6 +402,15 @@ export default function Gyms() {
     }
   }
 
+  const generateRandomPassword = (): string => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
+    let password = ''
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return password
+  }
+
   const generateQRCode = async (gymId: string, gymName: string): Promise<string> => {
     try {
       setGeneratingQR(true)
@@ -442,6 +483,90 @@ export default function Gyms() {
     }
   }
 
+  const copyCredentials = async () => {
+    if (!gymCredentials) return
+    
+    try {
+      const credentialsText = `Email: ${gymCredentials.email}\nPassword: ${gymCredentials.password}`
+      await navigator.clipboard.writeText(credentialsText)
+      alert("Credentials copied to clipboard!")
+    } catch (error) {
+      console.error("Error copying credentials:", error)
+      alert("Failed to copy credentials. Please copy manually.")
+    }
+  }
+
+  const checkAndGenerateCredentials = async (gym: Gym) => {
+    if (!firebase?.auth) return
+    
+    try {
+      const password = generateRandomPassword()
+      
+      try {
+        // Always try to create a new user first
+        const authUser = await createUserWithEmailAndPassword(firebase.auth, gym.email, password)
+        console.log("Firebase Auth user created successfully:", authUser.user.uid)
+        
+        // Set credentials and show modal
+        setGymCredentials({
+          email: gym.email,
+          password: password,
+          gymName: gym.name
+        })
+        
+        // Show credentials modal
+        setCurrentGymName(gym.name)
+        setShowQRModal(true)
+        
+      } catch (authError: any) {
+        console.error("Error creating Firebase Auth user:", authError)
+        if (authError.code === 'auth/email-already-in-use') {
+          // User already exists, reset password using admin API
+          setResettingPassword(gym.gymID)
+          try {
+            const response = await fetch('/api/reset-gym-password', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ email: gym.email })
+            })
+
+            const result = await response.json()
+            
+            if (result.success) {
+              // Set new credentials and show modal
+              setGymCredentials({
+                email: gym.email,
+                password: result.password,
+                gymName: gym.name
+              })
+              
+              // Show credentials modal
+              setCurrentGymName(gym.name)
+              setShowQRModal(true)
+            } else {
+              alert(`Failed to reset password: ${result.error}`)
+            }
+          } catch (resetError) {
+            console.error("Error resetting password:", resetError)
+            alert("Failed to reset existing user password. Please try again.")
+          } finally {
+            setResettingPassword(null)
+          }
+          return
+        } else {
+          alert("Failed to create user account. Please try again.")
+          return
+        }
+      }
+      
+    } catch (error) {
+      console.error("Error handling credentials:", error)
+      alert("Failed to handle credentials. Please try again.")
+    }
+  }
+
   if (!user) {
     return null
   }
@@ -479,7 +604,7 @@ export default function Gyms() {
           {(loadingGyms || firebaseLoading)
             ? gymSkeletons
             : gyms.map((gym) => (
-                <div key={gym.gymID} className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+                <div key={gym.gymID} className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex flex-col">
                   <div className="relative h-48">
                     <Image
                       src={gym.imageUrl1 || "/placeholder.svg?height=200&width=400"}
@@ -489,7 +614,7 @@ export default function Gyms() {
                     />
                   </div>
 
-                  <div className="p-6">
+                  <div className="p-6 flex flex-col flex-1">
                     <div className="flex justify-between items-start mb-4">
                       <h3 className="text-xl font-semibold text-white">{gym.name}</h3>
                       <span className="bg-[#B3FF13] text-black px-2 py-1 rounded text-sm font-medium">
@@ -514,26 +639,34 @@ export default function Gyms() {
                       </div>
                     </div>
 
-                    <p className="text-gray-300 text-sm mb-4 line-clamp-2">{gym.description}</p>
+                    <p className="text-gray-300 text-sm mb-4 line-clamp-2 flex-1">{gym.description}</p>
 
-                    <div className="flex space-x-2">
+                    <div className="grid grid-cols-2 gap-2 mt-auto">
                       <button 
                         onClick={() => handleEditGym(gym)}
-                        className="flex-1 bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2"
+                        className="bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2"
                       >
                         <Edit size={16} />
                         <span>Edit</span>
                       </button>
                       <button
                         onClick={() => showQRCode(gym)}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
                       >
                         <QrCode size={16} />
                         <span>QR Code</span>
                       </button>
                       <button
+                        onClick={() => checkAndGenerateCredentials(gym)}
+                        disabled={resettingPassword === gym.gymID}
+                        className="bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Key size={16} />
+                        <span>{resettingPassword === gym.gymID ? 'Resetting...' : 'Reset/Get Credentials'}</span>
+                      </button>
+                      <button
                         onClick={() => handleDeleteGym(gym.gymID)}
-                        className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
+                        className="bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
                       >
                         <Trash2 size={16} />
                         <span>Delete</span>
@@ -905,53 +1038,95 @@ export default function Gyms() {
         {/* QR Code Modal */}
         {showQRModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-lg max-w-md w-full">
-              <div className="flex justify-between items-center p-6 border-b border-gray-800">
-                <h2 className="text-xl font-semibold text-white">QR Code: {currentGymName}</h2>
+            <div className="bg-gray-900 border border-gray-800 rounded-lg max-w-lg w-full">
+              <div className="flex justify-between items-center p-4 border-b border-gray-800">
+                <h2 className="text-lg font-semibold text-white">
+                  {gymCredentials && gymCredentials.gymName === currentGymName ? 'Gym Credentials' : 'Gym Details'}: {currentGymName}
+                </h2>
                 <button
                   onClick={() => setShowQRModal(false)}
                   className="text-gray-400 hover:text-white"
                 >
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
               
-              <div className="p-6 text-center">
-                {currentQRCode ? (
-                  <>
-                    <div className="mb-4">
-                      <img 
-                        src={currentQRCode} 
-                        alt="QR Code" 
-                        className="mx-auto border border-gray-700 rounded-lg"
-                        style={{ maxWidth: '300px', height: 'auto' }}
-                      />
-                    </div>
-                    
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={downloadQRCode}
-                        className="flex-1 bg-[#B3FF13] text-black py-2 px-4 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors flex items-center justify-center space-x-2"
-                      >
-                        <Download size={16} />
-                        <span>Download QR Code</span>
-                      </button>
-                    </div>
-                    
-                    <p className="text-xs text-gray-400 mt-3">
-                      This QR code contains the gym ID and can be scanned by users to access gym information.
+              <div className="p-4">
+                {/* Show either QR Code OR Credentials, not both */}
+                {gymCredentials && gymCredentials.gymName === currentGymName ? (
+                  /* Credentials Section */
+                  <div className="text-center">
+                    <h3 className="text-base font-medium text-white mb-3">Dashboard Credentials</h3>
+                    <p className="text-gray-400 text-xs text-center mb-3">
+                      These credentials are for the gym's dashboard access. Please save them securely.
                     </p>
-                  </>
+                    
+                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-400 text-xs">Email:</span>
+                        <span className="text-white font-mono font-semibold text-sm">{gymCredentials.email}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400 text-xs">Password:</span>
+                        <span className="text-white font-mono font-semibold text-sm">{gymCredentials.password}</span>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={copyCredentials}
+                      className="w-full bg-[#B3FF13] text-black py-2 px-4 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors flex items-center justify-center space-x-2 text-sm"
+                    >
+                      <Clipboard size={14} />
+                      <span>Copy Credentials</span>
+                    </button>
+                    
+                    <div className="mt-3 p-2 bg-yellow-900 border border-yellow-700 rounded-lg">
+                      <p className="text-yellow-200 text-xs text-center">
+                        ⚠️ Please save these credentials now. The password cannot be retrieved later.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="py-8">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#B3FF13] mx-auto mb-4"></div>
-                    <p className="text-gray-400">Generating QR code...</p>
+                  /* QR Code Section */
+                  <div className="text-center">
+                    <h3 className="text-base font-medium text-white mb-3">QR Code</h3>
+                    {currentQRCode ? (
+                      <>
+                        <div className="mb-3">
+                          <img 
+                            src={currentQRCode} 
+                            alt="QR Code" 
+                            className="mx-auto border border-gray-700 rounded-lg"
+                            style={{ maxWidth: '200px', height: 'auto' }}
+                          />
+                        </div>
+                        
+                        <button
+                          onClick={downloadQRCode}
+                          className="bg-[#B3FF13] text-black py-2 px-3 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors flex items-center justify-center space-x-2 mx-auto text-sm"
+                        >
+                          <Download size={14} />
+                          <span>Download QR Code</span>
+                        </button>
+                        
+                        <p className="text-xs text-gray-400 mt-2">
+                          This QR code contains the gym ID and can be scanned by users to access gym information.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="py-4">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#B3FF13] mx-auto mb-3"></div>
+                        <p className="text-gray-400 text-sm">Generating QR code...</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
         )}
+
+
 
         {/* Edit Gym Modal */}
         {showEditModal && editingGym && (

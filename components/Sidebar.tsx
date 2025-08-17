@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Dumbbell, Users, QrCode, Bell, CreditCard, Settings, LogOut, Building2, AlertTriangle } from "lucide-react"
+import { Home, Dumbbell, Users, QrCode, Bell, CreditCard, Settings, LogOut, Building2, AlertTriangle, Wallet } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { useState } from "react"
+import { useWithdrawalCount } from "@/hooks/useWithdrawalCount"
 
 const sidebarItems = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -15,6 +16,7 @@ const sidebarItems = [
   { name: "QR Scans", href: "/qr-scans", icon: QrCode },
   { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Transactions", href: "/transactions", icon: CreditCard },
+  { name: "Gyms Withdrawals", href: "/gyms-withdrawals", icon: Wallet },
 ]
 
 export default function Sidebar() {
@@ -22,6 +24,7 @@ export default function Sidebar() {
   const router = useRouter()
   const { signOut } = useAuth()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const { pendingCount } = useWithdrawalCount()
 
   const handleLogout = async () => {
     try {
@@ -44,17 +47,25 @@ export default function Sidebar() {
           {sidebarItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
+            const showBadge = item.name === "Gyms Withdrawals" && pendingCount > 0
 
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
                   isActive ? "bg-[#B3FF13] text-black" : "text-white hover:bg-gray-800"
                 }`}
               >
-                <Icon size={20} />
-                <span>{item.name}</span>
+                <div className="flex items-center space-x-3">
+                  <Icon size={20} />
+                  <span>{item.name}</span>
+                </div>
+                {showBadge && (
+                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             )
           })}
