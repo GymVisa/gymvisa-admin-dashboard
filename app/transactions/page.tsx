@@ -83,36 +83,87 @@ export default function TransactionsAnalytics() {
   // Time series data (by period)
   const chartData = useMemo(() => {
     const byPeriod: Record<string, { revenue: number; count: number }> = {}
+    
     filteredTxns.forEach(txn => {
       let key = ""
-      const date = new Date(txn.UpdatedAt)
-      if (isNaN(date.getTime())) return // skip invalid dates
-      if (period === "daily") {
-        key = date.toISOString().split("T")[0]
-      } else if (period === "weekly") {
-        const firstDay = new Date(date)
-        firstDay.setDate(date.getDate() - date.getDay())
-        key = firstDay.toISOString().split("T")[0]
-      } else if (period === "monthly") {
-        key = date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0")
+      
+      // Try different possible date fields
+      let dateField = txn.UpdatedAt || txn.createdAt || txn.CreatedAt || txn.date || txn.Date || txn.timestamp || txn.Timestamp
+      
+      // If no date field found, use current date as fallback
+      if (!dateField) {
+        dateField = new Date().toISOString()
       }
+      
+      const date = new Date(dateField)
+      
+      if (isNaN(date.getTime())) {
+        // Use current date as fallback if parsing fails
+        const fallbackDate = new Date()
+        if (period === "daily") {
+          key = fallbackDate.toISOString().split("T")[0]
+        } else if (period === "weekly") {
+          const firstDay = new Date(fallbackDate)
+          firstDay.setDate(fallbackDate.getDate() - fallbackDate.getDay())
+          key = firstDay.toISOString().split("T")[0]
+        } else if (period === "monthly") {
+          key = fallbackDate.getFullYear() + "-" + String(fallbackDate.getMonth() + 1).padStart(2, "0")
+        }
+      } else {
+        if (period === "daily") {
+          key = date.toISOString().split("T")[0]
+        } else if (period === "weekly") {
+          const firstDay = new Date(date)
+          firstDay.setDate(date.getDate() - date.getDay())
+          key = firstDay.toISOString().split("T")[0]
+        } else if (period === "monthly") {
+          key = date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0")
+        }
+      }
+      
       if (!byPeriod[key]) byPeriod[key] = { revenue: 0, count: 0 }
       if (txn.Status === "Paid") byPeriod[key].revenue += txn.Amount || 0
       byPeriod[key].count += 1
     })
+    
     const keys = Object.keys(byPeriod).sort()
+    
+    // Format labels for better readability
+    const formattedLabels = keys.map(periodKey => {
+      if (period === "daily") {
+        const date = new Date(periodKey)
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      } else if (period === "weekly") {
+        const date = new Date(periodKey)
+        const endDate = new Date(date)
+        endDate.setDate(date.getDate() + 6)
+        return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      } else {
+        const [year, month] = periodKey.split('-')
+        const date = new Date(parseInt(year), parseInt(month) - 1)
+        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      }
+    })
+    
     return {
-      labels: keys,
+      labels: formattedLabels,
       datasets: [
         {
           label: "Revenue",
           data: keys.map(k => byPeriod[k].revenue),
           borderColor: "#B3FF13",
-          backgroundColor: "rgba(179, 255, 19, 0.1)",
+          backgroundColor: "rgba(179, 255, 19, 0.2)",
           borderWidth: 3,
           fill: true,
           tension: 0.4,
           yAxisID: "y",
+          pointBackgroundColor: "#B3FF13",
+          pointBorderColor: "#ffffff",
+          pointBorderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 10,
+          pointHoverBackgroundColor: "#ffffff",
+          pointHoverBorderColor: "#B3FF13",
         },
         {
           label: "Transactions",
@@ -123,6 +174,13 @@ export default function TransactionsAnalytics() {
           fill: false,
           tension: 0.4,
           yAxisID: "y1",
+          pointBackgroundColor: "#3B82F6",
+          pointBorderColor: "#ffffff",
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          pointHoverBackgroundColor: "#ffffff",
+          pointHoverBorderColor: "#3B82F6",
         },
       ],
     }
@@ -158,26 +216,148 @@ export default function TransactionsAnalytics() {
   const chartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: true } },
+    plugins: { 
+      legend: { 
+        display: true,
+        position: 'top' as const,
+        labels: {
+          color: '#ffffff',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          },
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        titleColor: '#B3FF13',
+        bodyColor: '#ffffff',
+        borderColor: '#B3FF13',
+        borderWidth: 1,
+        titleFont: {
+          size: 16,
+          weight: 'bold' as const
+        },
+        bodyFont: {
+          size: 14
+        },
+        callbacks: {
+          title: function(context: any) {
+            return `Period: ${context[0].label}`
+          },
+          label: function(context: any) {
+            if (context.datasetIndex === 0) {
+              return `Revenue: Rs ${context.parsed.y.toLocaleString()}`
+            } else {
+              return `Transactions: ${context.parsed.y}`
+            }
+          }
+        }
+      }
+    },
     scales: {
       y: {
         type: "linear" as const,
         beginAtZero: true,
-        title: { display: true, text: "Revenue" },
+        title: { 
+          display: true, 
+          text: "Revenue (Rs)",
+          color: '#B3FF13',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          }
+        },
         position: "left" as const,
-        grid: { color: "rgba(255,255,255,0.1)" },
-        ticks: { color: "#B3FF13" },
+        grid: { 
+          color: "rgba(255,255,255,0.1)",
+          drawBorder: true,
+          borderColor: "rgba(255,255,255,0.3)"
+        },
+        ticks: { 
+          color: "#B3FF13",
+          font: {
+            size: 12
+          },
+          callback: function(value: any) {
+            return `Rs ${value.toLocaleString()}`
+          }
+        },
+        border: {
+          color: "rgba(255,255,255,0.3)"
+        }
       },
       y1: {
         type: "linear" as const,
         beginAtZero: true,
-        title: { display: true, text: "Transactions" },
+        title: { 
+          display: true, 
+          text: "Number of Transactions",
+          color: '#3B82F6',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          }
+        },
         position: "right" as const,
-        grid: { drawOnChartArea: false },
-        ticks: { color: "#3B82F6" },
+        grid: { 
+          drawOnChartArea: false,
+          color: "rgba(255,255,255,0.05)"
+        },
+        ticks: { 
+          color: "#3B82F6",
+          font: {
+            size: 12
+          },
+          stepSize: 1,
+          callback: function(value: any) {
+            return Math.floor(value) === value ? value : ''
+          }
+        },
+        border: {
+          color: "rgba(255,255,255,0.3)"
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: "Time Period",
+          color: '#ffffff',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          }
+        },
+        grid: { 
+          color: "rgba(255,255,255,0.1)",
+          drawBorder: true,
+          borderColor: "rgba(255,255,255,0.3)"
+        },
+        ticks: { 
+          color: "#ffffff",
+          font: {
+            size: 12
+          },
+          maxRotation: 45,
+          minRotation: 0
+        },
+        border: {
+          color: "rgba(255,255,255,0.3)"
+        }
       },
     },
-  }), [])
+    interaction: {
+      intersect: false,
+      mode: 'index' as const
+    },
+    elements: {
+      point: {
+        hoverRadius: 10
+      }
+    }
+  }), [period])
 
   // Auth loading: show skeletons only
   if (authLoading) {
@@ -315,6 +495,7 @@ export default function TransactionsAnalytics() {
             {loading ? <Skeleton className="h-80 w-full" /> : <Line data={chartData} options={chartOptions} />}
           </div>
         </div>
+        
         {/* Table */}
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-white mb-4">{period.charAt(0).toUpperCase() + period.slice(1)} Transactions</h2>

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Dumbbell, Users, QrCode, Bell, CreditCard, Settings, LogOut, Building2, AlertTriangle, Wallet } from "lucide-react"
+import { Home, Dumbbell, Users, QrCode, Bell, CreditCard, Settings, LogOut, Building2, AlertTriangle, Wallet, CreditCard as CreditCardIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/AuthProvider"
 import { useState } from "react"
@@ -13,6 +13,7 @@ const sidebarItems = [
   { name: "Gyms", href: "/gyms", icon: Dumbbell },
   { name: "Users", href: "/users", icon: Users },
   { name: "Organizations", href: "/organizations", icon: Building2 },
+  { name: "Subscriptions", href: "/subscriptions", icon: CreditCardIcon },
   { name: "QR Scans", href: "/qr-scans", icon: QrCode },
   { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Transactions", href: "/transactions", icon: CreditCard },

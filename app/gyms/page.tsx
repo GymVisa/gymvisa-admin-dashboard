@@ -659,7 +659,7 @@ export default function Gyms() {
                       <button
                         onClick={() => checkAndGenerateCredentials(gym)}
                         disabled={resettingPassword === gym.gymID}
-                        className="bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                       >
                         <Key size={16} />
                         <span>{resettingPassword === gym.gymID ? 'Resetting...' : 'Reset/Get Credentials'}</span>
@@ -1354,6 +1354,453 @@ export default function Gyms() {
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-[#B3FF13] focus:outline-none"
                     placeholder="Enter gym description..."
                   />
+                </div>
+
+                {/* Operating Hours Section */}
+                <div className="border-t border-gray-800 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-white">Operating Hours (Optional)</h3>
+                    <div className="flex items-center space-x-3">
+                      <label className="flex items-center space-x-2 text-white text-sm">
+                        <input
+                          type="checkbox"
+                          checked={editingGym.operatingHours?.unified ?? true}
+                          onChange={() => {
+                            const newUnified = !(editingGym.operatingHours?.unified ?? true)
+                            if (newUnified) {
+                              // If switching to unified, copy male timings to female
+                              setEditingGym({
+                                ...editingGym,
+                                operatingHours: {
+                                  unified: true,
+                                  male: editingGym.operatingHours?.male ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  },
+                                  female: editingGym.operatingHours?.male ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                }
+                              })
+                            } else {
+                              // If switching to separate, keep current timings
+                              setEditingGym({
+                                ...editingGym,
+                                operatingHours: {
+                                  unified: false,
+                                  male: editingGym.operatingHours?.male ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  },
+                                  female: editingGym.operatingHours?.female ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                }
+                              })
+                            }
+                          }}
+                          className="rounded border-gray-600 bg-gray-700 text-[#B3FF13] focus:ring-[#B3FF13] focus:ring-offset-gray-800"
+                        />
+                        <span>Same timing for Men and Women</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {(editingGym.operatingHours?.unified ?? true) ? (
+                    <div className="space-y-3">
+                      <h4 className="text-md font-medium text-gray-300">Unified Operating Hours</h4>
+                      {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
+                        <div key={day} className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg">
+                          <div className="w-20 text-white text-sm font-medium capitalize">{day}</div>
+                          <label className="flex items-center space-x-2 text-white text-sm">
+                            <input
+                              type="checkbox"
+                              checked={!(editingGym.operatingHours?.male?.[day]?.closed ?? true)}
+                                                              onChange={(e) => {
+                                  const newClosed = !e.target.checked
+                                  const currentMale = editingGym.operatingHours?.male ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                  const currentFemale = editingGym.operatingHours?.female ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                  
+                                  const updatedMale = {
+                                    ...currentMale,
+                                    [day]: {
+                                      ...currentMale[day],
+                                      closed: newClosed
+                                    }
+                                  }
+                                  const updatedFemale = {
+                                    ...currentFemale,
+                                    [day]: {
+                                      ...currentFemale[day],
+                                      closed: newClosed
+                                    }
+                                  }
+                                  setEditingGym({
+                                    ...editingGym,
+                                    operatingHours: {
+                                      unified: true,
+                                      male: updatedMale,
+                                      female: updatedFemale
+                                    }
+                                  })
+                                }}
+                              className="rounded border-gray-600 bg-gray-700 text-[#B3FF13] focus:ring-[#B3FF13] focus:ring-offset-gray-800"
+                            />
+                            <span>Open</span>
+                          </label>
+                          {!(editingGym.operatingHours?.male?.[day]?.closed ?? true) && (
+                            <>
+                              <input
+                                type="time"
+                                value={editingGym.operatingHours?.male?.[day]?.open ?? "06:00"}
+                                onChange={(e) => {
+                                  const currentMale = editingGym.operatingHours?.male ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                  const currentFemale = editingGym.operatingHours?.female ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                  
+                                  const updatedMale = {
+                                    ...currentMale,
+                                    [day]: {
+                                      ...currentMale[day],
+                                      open: e.target.value
+                                    }
+                                  }
+                                  const updatedFemale = {
+                                    ...currentFemale,
+                                    [day]: {
+                                      ...currentFemale[day],
+                                      open: e.target.value
+                                    }
+                                  }
+                                  setEditingGym({
+                                    ...editingGym,
+                                    operatingHours: {
+                                      unified: true,
+                                      male: updatedMale,
+                                      female: updatedFemale
+                                    }
+                                  })
+                                }}
+                                className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              />
+                              <span className="text-gray-400">to</span>
+                              <input
+                                type="time"
+                                value={editingGym.operatingHours?.male?.[day]?.close ?? "22:00"}
+                                onChange={(e) => {
+                                  const currentMale = editingGym.operatingHours?.male ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                  const currentFemale = editingGym.operatingHours?.female ?? {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false }
+                                  }
+                                  
+                                  const updatedMale = {
+                                    ...currentMale,
+                                    [day]: {
+                                      ...currentMale[day],
+                                      close: e.target.value
+                                    }
+                                  }
+                                  const updatedFemale = {
+                                    ...currentFemale,
+                                    [day]: {
+                                      ...currentFemale[day],
+                                      close: e.target.value
+                                    }
+                                  }
+                                  setEditingGym({
+                                    ...editingGym,
+                                    operatingHours: {
+                                      unified: true,
+                                      male: updatedMale,
+                                      female: updatedFemale
+                                    }
+                                  })
+                                }}
+                                className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              />
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-md font-medium text-gray-300 mb-3">Male Operating Hours</h4>
+                        {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
+                          <div key={day} className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg mb-2">
+                            <div className="w-20 text-white text-sm font-medium capitalize">{day}</div>
+                            <label className="flex items-center space-x-2 text-white text-sm">
+                              <input
+                                type="checkbox"
+                                checked={!(editingGym.operatingHours?.male?.[day]?.closed ?? true)}
+                                onChange={(e) => {
+                                                                      const updatedMale = {
+                                      monday: { open: "06:00", close: "22:00", closed: false },
+                                      tuesday: { open: "06:00", close: "22:00", closed: false },
+                                      wednesday: { open: "06:00", close: "22:00", closed: false },
+                                      thursday: { open: "06:00", close: "22:00", closed: false },
+                                      friday: { open: "06:00", close: "22:00", closed: false },
+                                      saturday: { open: "08:00", close: "20:00", closed: false },
+                                      sunday: { open: "08:00", close: "20:00", closed: false },
+                                      [day]: {
+                                        open: editingGym.operatingHours?.male?.[day]?.open ?? "06:00",
+                                        close: editingGym.operatingHours?.male?.[day]?.close ?? "22:00",
+                                        closed: !e.target.checked
+                                      }
+                                    }
+                                                                      setEditingGym({
+                                      ...editingGym,
+                                      operatingHours: {
+                                        unified: true,
+                                        male: updatedMale,
+                                        female: updatedMale
+                                      }
+                                    })
+                                }}
+                                className="rounded border-gray-600 bg-gray-700 text-[#B3FF13] focus:ring-[#B3FF13] focus:ring-offset-gray-800"
+                              />
+                              <span>Open</span>
+                            </label>
+                            {!(editingGym.operatingHours?.male?.[day]?.closed ?? true) && (
+                              <>
+                                <input
+                                  type="time"
+                                  value={editingGym.operatingHours?.male?.[day]?.open ?? "06:00"}
+                                  onChange={(e) => {
+                                    const updatedMale = {
+                                      monday: { open: "06:00", close: "22:00", closed: false },
+                                      tuesday: { open: "06:00", close: "22:00", closed: false },
+                                      wednesday: { open: "06:00", close: "22:00", closed: false },
+                                      thursday: { open: "06:00", close: "22:00", closed: false },
+                                      friday: { open: "06:00", close: "22:00", closed: false },
+                                      saturday: { open: "08:00", close: "20:00", closed: false },
+                                      sunday: { open: "08:00", close: "20:00", closed: false },
+                                      [day]: {
+                                        open: e.target.value,
+                                        close: "22:00",
+                                        closed: false
+                                      }
+                                    }
+                                    setEditingGym({
+                                      ...editingGym,
+                                      operatingHours: {
+                                        unified: editingGym.operatingHours?.unified ?? true,
+                                        male: updatedMale,
+                                        female: editingGym.operatingHours?.female ?? updatedMale
+                                      }
+                                    })
+                                  }}
+                                  className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                                />
+                                <span className="text-gray-400">to</span>
+                                <input
+                                  type="time"
+                                  value={editingGym.operatingHours?.male?.[day]?.close ?? "22:00"}
+                                  onChange={(e) => {
+                                    const updatedMale = {
+                                      monday: { open: "06:00", close: "22:00", closed: false },
+                                      tuesday: { open: "06:00", close: "22:00", closed: false },
+                                      wednesday: { open: "06:00", close: "22:00", closed: false },
+                                      thursday: { open: "06:00", close: "22:00", closed: false },
+                                      friday: { open: "06:00", close: "22:00", closed: false },
+                                      saturday: { open: "08:00", close: "20:00", closed: false },
+                                      sunday: { open: "08:00", close: "20:00", closed: false },
+                                      [day]: {
+                                        open: editingGym.operatingHours?.male?.[day]?.open ?? "06:00",
+                                        close: e.target.value,
+                                        closed: false
+                                      }
+                                    }
+                                    setEditingGym({
+                                      ...editingGym,
+                                      operatingHours: {
+                                        unified: editingGym.operatingHours?.unified ?? true,
+                                        male: updatedMale,
+                                        female: editingGym.operatingHours?.female ?? updatedMale
+                                      }
+                                    })
+                                  }}
+                                  className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                                />
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div>
+                        <h4 className="text-md font-medium text-gray-300 mb-3">Female Operating Hours</h4>
+                        {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
+                          <div key={day} className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg mb-2">
+                            <div className="w-20 text-white text-sm font-medium capitalize">{day}</div>
+                            <label className="flex items-center space-x-2 text-white text-sm">
+                              <input
+                                type="checkbox"
+                                checked={!(editingGym.operatingHours?.female?.[day]?.closed ?? true)}
+                                onChange={(e) => {
+                                  const updatedFemale = {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false },
+                                    [day]: {
+                                      open: editingGym.operatingHours?.female?.[day]?.open ?? "06:00",
+                                      close: editingGym.operatingHours?.female?.[day]?.close ?? "22:00",
+                                      closed: !e.target.checked
+                                    }
+                                  }
+                                  setEditingGym({
+                                    ...editingGym,
+                                    operatingHours: {
+                                      unified: editingGym.operatingHours?.unified ?? false,
+                                      male: editingGym.operatingHours?.male ?? updatedFemale,
+                                      female: updatedFemale
+                                    }
+                                  })
+                                }}
+                                className="rounded border-gray-600 bg-gray-700 text-[#B3FF13] focus:ring-[#B3FF13] focus:ring-offset-gray-800"
+                              />
+                              <span>Open</span>
+                            </label>
+                            {!(editingGym.operatingHours?.female?.[day]?.closed ?? true) && (
+                              <>
+                                <input
+                                  type="time"
+                                  value={editingGym.operatingHours?.female?.[day]?.open ?? "06:00"}
+                                  onChange={(e) => {
+                                                                      const updatedFemale = {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false },
+                                    [day]: {
+                                      open: e.target.value,
+                                      close: editingGym.operatingHours?.female?.[day]?.close ?? "22:00",
+                                      closed: false
+                                    }
+                                  }
+                                  setEditingGym({
+                                    ...editingGym,
+                                    operatingHours: {
+                                      unified: editingGym.operatingHours?.unified ?? false,
+                                      male: editingGym.operatingHours?.male ?? updatedFemale,
+                                      female: updatedFemale
+                                    }
+                                  })
+                                  }}
+                                  className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                                />
+                                <span className="text-gray-400">to</span>
+                                <input
+                                  type="time"
+                                  value={editingGym.operatingHours?.female?.[day]?.close ?? "22:00"}
+                                  onChange={(e) => {
+                                                                      const updatedFemale = {
+                                    monday: { open: "06:00", close: "22:00", closed: false },
+                                    tuesday: { open: "06:00", close: "22:00", closed: false },
+                                    wednesday: { open: "06:00", close: "22:00", closed: false },
+                                    thursday: { open: "06:00", close: "22:00", closed: false },
+                                    friday: { open: "06:00", close: "22:00", closed: false },
+                                    saturday: { open: "08:00", close: "20:00", closed: false },
+                                    sunday: { open: "08:00", close: "20:00", closed: false },
+                                    [day]: {
+                                      open: editingGym.operatingHours?.female?.[day]?.open ?? "06:00",
+                                      close: e.target.value,
+                                      closed: false
+                                    }
+                                  }
+                                  setEditingGym({
+                                    ...editingGym,
+                                    operatingHours: {
+                                      unified: editingGym.operatingHours?.unified ?? false,
+                                      male: editingGym.operatingHours?.male ?? updatedFemale,
+                                      female: updatedFemale
+                                    }
+                                  })
+                                  }}
+                                  className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                                />
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex space-x-3 pt-4">

@@ -28,8 +28,8 @@ export default function QRAnalytics() {
   const [loading, setLoading] = useState(true)
   const [qrScans, setQrScans] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
-  const [gyms, setGyms] = useState<any[]>([])
   const [filter, setFilter] = useState({ gym: "", user: "", start: "", end: "" })
+  const [period, setPeriod] = useState("daily") // "daily", "weekly", "monthly"
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -42,29 +42,35 @@ export default function QRAnalytics() {
     setLoading(true)
     const fetchAll = async () => {
       const { collection, getDocs } = await import("firebase/firestore")
-      const [qrSnap, userSnap, gymSnap] = await Promise.all([
-        getDocs(collection(firebase.db, "QR")),
+      const [qrSnap, userSnap] = await Promise.all([
+        getDocs(collection(firebase.db, "QRs")),
         getDocs(collection(firebase.db, "User")),
-        getDocs(collection(firebase.db, "Gyms")),
       ])
       setQrScans(qrSnap.docs.map((doc) => ({ QRID: doc.id, ...doc.data() })))
       setUsers(userSnap.docs.map((doc) => ({ UserID: doc.id, ...doc.data() })))
-      setGyms(gymSnap.docs.map((doc) => ({ gymID: doc.id, ...doc.data() })))
       setLoading(false)
     }
     fetchAll()
   }, [firebase?.db, user])
 
+  // Extract unique gyms from QR scans data
+  const uniqueGyms = useMemo(() => {
+    const gymSet = new Set<string>()
+    qrScans.forEach(scan => {
+      if (scan.gymName) {
+        gymSet.add(scan.gymName)
+      }
+    })
+    return Array.from(gymSet).sort()
+  }, [qrScans])
+
   // Map for quick lookup
   const userMap = useMemo(() => Object.fromEntries(users.map(u => [u.UserID, u])), [users])
-  // Map gyms by gymName and gymID for robust lookup
-  const gymNameMap = useMemo(() => Object.fromEntries(gyms.map(g => [g.gymName, g])), [gyms])
-  const gymIdMap = useMemo(() => Object.fromEntries(gyms.map(g => [g.gymID, g])), [gyms])
 
   // Filtered scans
   const filteredScans = useMemo(() => {
     return qrScans.filter(scan => {
-      const matchGym = !filter.gym || scan.gymName === filter.gym || scan.gymID === filter.gym
+      const matchGym = !filter.gym || scan.gymName === filter.gym
       const matchUser = !filter.user || scan.UserID === filter.user
       const matchStart = !filter.start || new Date(scan.Time) >= new Date(filter.start)
       const matchEnd = !filter.end || new Date(scan.Time) <= new Date(filter.end)
@@ -82,32 +88,180 @@ export default function QRAnalytics() {
 
   // Time series data
   const chartData = useMemo(() => {
-    const byDay: Record<string, number> = {}
+    const byPeriod: Record<string, number> = {}
+    
     filteredScans.forEach(scan => {
-      const day = scan.Time.split("T")[0]
-      byDay[day] = (byDay[day] || 0) + 1
+      let key = ""
+      const date = new Date(scan.Time)
+      
+      if (isNaN(date.getTime())) return // skip invalid dates
+      
+      if (period === "daily") {
+        key = date.toISOString().split("T")[0]
+      } else if (period === "weekly") {
+        const firstDay = new Date(date)
+        firstDay.setDate(date.getDate() - date.getDay())
+        key = firstDay.toISOString().split("T")[0]
+      } else if (period === "monthly") {
+        key = date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0")
+      }
+      
+      byPeriod[key] = (byPeriod[key] || 0) + 1
     })
-    const days = Object.keys(byDay).sort()
+    
+    const periods = Object.keys(byPeriod).sort()
+    
+    // Format labels for better readability
+    const formattedLabels = periods.map(periodKey => {
+      if (period === "daily") {
+        const date = new Date(periodKey)
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      } else if (period === "weekly") {
+        const date = new Date(periodKey)
+        const endDate = new Date(date)
+        endDate.setDate(date.getDate() + 6)
+        return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      } else {
+        const [year, month] = periodKey.split('-')
+        const date = new Date(parseInt(year), parseInt(month) - 1)
+        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      }
+    })
+    
     return {
-      labels: days,
+      labels: formattedLabels,
       datasets: [
         {
           label: "QR Scans",
-          data: days.map(d => byDay[d]),
+          data: periods.map(p => byPeriod[p]),
           borderColor: "#B3FF13",
-          backgroundColor: "rgba(179, 255, 19, 0.1)",
+          backgroundColor: "rgba(179, 255, 19, 0.2)",
           borderWidth: 3,
           fill: true,
           tension: 0.4,
           pointBackgroundColor: "#B3FF13",
-          pointBorderColor: "#B3FF13",
+          pointBorderColor: "#ffffff",
           pointBorderWidth: 2,
           pointRadius: 6,
-          pointHoverRadius: 8,
+          pointHoverRadius: 10,
+          pointHoverBackgroundColor: "#ffffff",
+          pointHoverBorderColor: "#B3FF13",
         },
       ],
     }
-  }, [filteredScans])
+  }, [filteredScans, period])
+
+  // Chart options (memoized to prevent unnecessary re-renders)
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { 
+      legend: { 
+        display: true,
+        position: 'top' as const,
+        labels: {
+          color: '#ffffff',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          },
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        titleColor: '#B3FF13',
+        bodyColor: '#ffffff',
+        borderColor: '#B3FF13',
+        borderWidth: 1,
+        titleFont: {
+          size: 16,
+          weight: 'bold' as const
+        },
+        bodyFont: {
+          size: 14
+        },
+        callbacks: {
+          title: function(context: any) {
+            return `Date: ${context[0].label}`
+          },
+          label: function(context: any) {
+            return `Scans: ${context.parsed.y}`
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        type: "linear" as const,
+        beginAtZero: true,
+        title: { 
+          display: true, 
+          text: "Number of QR Scans",
+          color: '#ffffff',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          }
+        },
+        grid: { 
+          color: "rgba(255,255,255,0.1)",
+          drawBorder: true,
+          borderColor: "rgba(255,255,255,0.3)"
+        },
+        ticks: { 
+          color: "#ffffff",
+          font: {
+            size: 12
+          },
+          stepSize: 1,
+          callback: function(value: any) {
+            return Math.floor(value) === value ? value : ''
+          }
+        },
+        border: {
+          color: "rgba(255,255,255,0.3)"
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: "Time Period",
+          color: '#ffffff',
+          font: {
+            size: 14,
+            weight: 'bold' as const
+          }
+        },
+        grid: { 
+          color: "rgba(255,255,255,0.1)",
+          drawBorder: true,
+          borderColor: "rgba(255,255,255,0.3)"
+        },
+        ticks: { 
+          color: "#ffffff",
+          font: {
+            size: 12
+          },
+          maxRotation: 45,
+          minRotation: 0
+        },
+        border: {
+          color: "rgba(255,255,255,0.3)"
+        }
+      },
+    },
+    interaction: {
+      intersect: false,
+      mode: 'index' as const
+    },
+    elements: {
+      point: {
+        hoverRadius: 10
+      }
+    }
+  }), [period])
 
   // Gym-wise table (use gymName if available, else gymID)
   const gymsWithScans = useMemo(() => {
@@ -119,25 +273,6 @@ export default function QRAnalytics() {
     })
     return Object.entries(map).map(([gymKey, scans]) => ({ gymKey, scans }))
   }, [filteredScans])
-
-  // Chart options (memoized to prevent unnecessary re-renders)
-  const chartOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      y: {
-        type: "linear" as const,
-        beginAtZero: true,
-        grid: { color: "rgba(255,255,255,0.1)" },
-        ticks: { color: "#B3FF13" },
-      },
-      x: {
-        grid: { color: "rgba(255,255,255,0.1)" },
-        ticks: { color: "#B3FF13" },
-      },
-    },
-  }), [])
 
   // Auth loading: show skeletons only
   if (authLoading) {
@@ -206,7 +341,9 @@ export default function QRAnalytics() {
               onChange={e => setFilter(f => ({ ...f, gym: e.target.value }))}
             >
               <option value="">All</option>
-              {gyms.map(g => <option key={g.gymName} value={g.gymName}>{g.gymName}</option>)}
+              {uniqueGyms.map(gym => (
+                <option key={gym} value={gym}>{gym}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -246,6 +383,19 @@ export default function QRAnalytics() {
             <Search size={18} /> Reset Filters
           </button>
         </div>
+        {/* Period Toggle */}
+        <div className="flex gap-2 mb-4">
+          {["daily", "weekly", "monthly"].map(p => (
+            <button
+              key={p}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${period === p ? "bg-[#B3FF13] text-black" : "bg-gray-900 text-white border border-gray-800 hover:bg-gray-800"}`}
+              onClick={() => setPeriod(p)}
+            >
+              {p.charAt(0).toUpperCase() + p.slice(1)}
+            </button>
+          ))}
+        </div>
+        
         {/* Chart */}
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-8">
           <h2 className="text-xl font-semibold text-white mb-4">Scans Over Time</h2>
@@ -253,6 +403,8 @@ export default function QRAnalytics() {
             {loading ? <Skeleton className="h-80 w-full" /> : <Line data={chartData} options={chartOptions} />}
           </div>
         </div>
+        
+
         {/* Gym Table */}
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-white mb-4">Gym-wise Scan Details</h2>
@@ -274,7 +426,7 @@ export default function QRAnalytics() {
                 </thead>
                 <tbody>
                   {gymsWithScans.map(({ gymKey, scans }) => (
-                    <GymRow key={gymKey} gymKey={gymKey} scans={scans} userMap={userMap} gymNameMap={gymNameMap} gymIdMap={gymIdMap} />
+                    <GymRow key={gymKey} gymKey={gymKey} scans={scans} userMap={userMap} />
                   ))}
                 </tbody>
               </table>
@@ -286,7 +438,7 @@ export default function QRAnalytics() {
   )
 }
 
-function GymRow({ gymKey, scans, userMap, gymNameMap, gymIdMap }: { gymKey: string, scans: any[], userMap: Record<string, any>, gymNameMap: Record<string, any>, gymIdMap: Record<string, any> }) {
+function GymRow({ gymKey, scans, userMap }: { gymKey: string, scans: any[], userMap: Record<string, any> }) {
   const [open, setOpen] = useState(false)
   // Group scans by day
   const byDay: Record<string, any[]> = {}
@@ -304,7 +456,7 @@ function GymRow({ gymKey, scans, userMap, gymNameMap, gymIdMap }: { gymKey: stri
       >
         <td className="py-2 px-4 font-semibold text-white flex items-center gap-2">
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          {gymNameMap[gymKey]?.gymName || gymIdMap[gymKey]?.gymName || gymKey}
+          {gymKey}
         </td>
         <td className="py-2 px-4 text-[#B3FF13] font-bold">{scans.length}</td>
         <td className="py-2 px-4 text-blue-400 underline">{open ? "Hide" : "Show"} Details</td>
