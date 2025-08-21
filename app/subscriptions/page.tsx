@@ -15,6 +15,16 @@ interface Subscription {
   SubscriptionDays: string
 }
 
+// Add this interface for CreditPricing
+interface CreditPricing {
+  id: string
+  basePrice: number
+  discountTiers: Array<{
+    minCredits: number
+    pricePerCredit: number
+  }>
+}
+
 export default function Subscriptions() {
   const { user, loading: authLoading, initialized } = useAuth()
   const { firebase } = useFirebase()
@@ -28,6 +38,11 @@ export default function Subscriptions() {
     SubscriptionDays: ""
   })
   const [isUpdating, setIsUpdating] = useState(false)
+  const [creditPricing, setCreditPricing] = useState<CreditPricing | null>(null)
+  const [creditEditMode, setCreditEditMode] = useState(false)
+  const [creditBasePrice, setCreditBasePrice] = useState("")
+  const [creditPricePerCredit, setCreditPricePerCredit] = useState("")
+  const [creditLoading, setCreditLoading] = useState(false)
 
   useEffect(() => {
     if (initialized && !user) {
@@ -110,6 +125,65 @@ export default function Subscriptions() {
       setIsUpdating(false)
     }
   }, [firebase?.db, editForm.price, editForm.SubscriptionDays])
+
+  // Fetch CreditPricing
+  useEffect(() => {
+    const fetchCreditPricing = async () => {
+      if (!firebase?.db) return
+      const { collection, getDocs } = await import("firebase/firestore")
+      const snap = await getDocs(collection(firebase.db, "CreditPricing"))
+      if (!snap.empty) {
+        const doc = snap.docs[0]
+        const data = doc.data() as Omit<CreditPricing, "id">
+        setCreditPricing({ id: doc.id, ...data })
+        setCreditBasePrice(data.basePrice.toString())
+        setCreditPricePerCredit(
+          data.discountTiers && data.discountTiers.length > 0
+            ? data.discountTiers[0].pricePerCredit.toString()
+            : ""
+        )
+      }
+    }
+    if (user && firebase?.db) fetchCreditPricing()
+  }, [user, firebase?.db])
+
+  // Save CreditPricing
+  const handleSaveCreditPricing = async () => {
+    if (!firebase?.db || !creditPricing) return
+    setCreditLoading(true)
+    try {
+      const { doc, updateDoc } = await import("firebase/firestore")
+      await updateDoc(doc(firebase.db, "CreditPricing", creditPricing.id), {
+        basePrice: Number(creditBasePrice),
+        discountTiers: [
+          {
+            minCredits: creditPricing.discountTiers[0]?.minCredits ?? 1,
+            pricePerCredit: Number(creditPricePerCredit),
+          },
+        ],
+      })
+      setCreditPricing((prev) =>
+        prev
+          ? {
+              ...prev,
+              basePrice: Number(creditBasePrice),
+              discountTiers: [
+                {
+                  minCredits: prev.discountTiers[0]?.minCredits ?? 1,
+                  pricePerCredit: Number(creditPricePerCredit),
+                },
+              ],
+            }
+          : prev
+      )
+      setCreditEditMode(false)
+    } catch (e) {
+      alert("Failed to update credit pricing")
+      console.error(e)
+    } finally {
+      setCreditLoading(false)
+    }
+  }
 
   // Memoize the subscription cards to prevent unnecessary re-renders
   const subscriptionCards = useMemo(() => {
@@ -256,6 +330,88 @@ export default function Subscriptions() {
           <p className="text-gray-400">Manage subscription plans and pricing</p>
         </div>
 
+        {/* Credit Pricing Card */}
+        <div className="mb-8">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-white flex items-center">
+                <DollarSign className="mr-2 text-[#B3FF13]" /> Credit Pricing
+              </h3>
+              {creditEditMode ? (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handleSaveCreditPricing}
+                    disabled={creditLoading}
+                    className="bg-[#B3FF13] text-black p-2 rounded-lg hover:bg-[#9FE611] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Save changes"
+                  >
+                    {creditLoading ? (
+                      <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Save size={16} />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setCreditEditMode(false)}
+                    className="bg-gray-700 text-white p-2 rounded-lg hover:bg-gray-600 transition-colors"
+                    title="Cancel edit"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setCreditEditMode(true)}
+                  className="bg-gray-700 text-white p-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  title="Edit credit pricing"
+                  disabled={!creditPricing}
+                >
+                  <Edit size={16} />
+                </button>
+              )}
+            </div>
+            {creditEditMode ? (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[#B3FF13] text-lg font-semibold">Base Price ₨</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={creditBasePrice}
+                    onChange={(e) => setCreditBasePrice(e.target.value)}
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:border-[#B3FF13] focus:outline-none text-sm"
+                    placeholder="Enter base price"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[#B3FF13] text-lg font-semibold">Price Per Credit ₨</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={creditPricePerCredit}
+                    onChange={(e) => setCreditPricePerCredit(e.target.value)}
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:border-[#B3FF13] focus:outline-none text-sm"
+                    placeholder="Enter price per credit"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[#B3FF13] text-lg font-semibold">Base Price ₨</span>
+                  <span className="text-gray-300">{creditPricing?.basePrice ?? "--"}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[#B3FF13] text-lg font-semibold">Price Per Credit ₨</span>
+                  <span className="text-gray-300">
+                    {creditPricing?.discountTiers?.[0]?.pricePerCredit ?? "--"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
             subscriptionSkeletons
@@ -282,4 +438,4 @@ export default function Subscriptions() {
       </div>
     </div>
   )
-} 
+}

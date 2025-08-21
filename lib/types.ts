@@ -10,6 +10,7 @@ export interface Gym {
   imageUrl1: string
   imageUrl2: string
   googleMapsLink: string
+  creditsPerVisit: number
   qrCodeUrl: string
   subscription: string
   operatingHours?: {
@@ -43,6 +44,7 @@ export interface User {
   FCMToken: string
   isUserFreezed?: boolean
   Organization?: string
+  credits?: number
 }
 
 export interface QRScan {

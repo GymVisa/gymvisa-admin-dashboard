@@ -38,7 +38,8 @@ export default function Gyms() {
     imageUrl2: "",
     googleMapsLink: "",
     qrCodeUrl: "",
-        subscription: "Standard",
+    subscription: "Standard",
+    creditsPerVisit: 0, // <-- Add this default value
     operatingHours: {
       unified: true,
       male: {
@@ -221,6 +222,7 @@ export default function Gyms() {
         googleMapsLink: "",
         qrCodeUrl: "",
         subscription: "Standard",
+        creditsPerVisit: 1,
         operatingHours: {
           unified: true,
           male: {
@@ -641,6 +643,16 @@ export default function Gyms() {
 
                     <p className="text-gray-300 text-sm mb-4 line-clamp-2 flex-1">{gym.description}</p>
 
+                                        {/* New Credits Per Scan Display */}
+                    <div className="mt-4 mb-4 flex items-center justify-between">
+                      <span className="text-gray-400 text-sm">Credits Per Scan:</span>
+                      <span className="bg-gray-800 text-[#B3FF13] px-3 py-1 rounded text-sm font-semibold">
+                        {gym.creditsPerVisit ?? 0}
+                      </span>
+                    </div>
+
+
+
                     <div className="grid grid-cols-2 gap-2 mt-auto">
                       <button 
                         onClick={() => handleEditGym(gym)}
@@ -875,6 +887,19 @@ export default function Gyms() {
                   </div>
                 </div>
                 
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Credits Per Scan</label>
+                    <input
+                      type="number"
+                      name="creditsPerVisit"
+                      min={1}
+                      value={newGym.creditsPerVisit}
+                      onChange={e => setNewGym(prev => ({ ...prev, creditsPerVisit: Number(e.target.value) }))}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-[#B3FF13] focus:outline-none"
+                      required
+                    />
+                  </div>
+
                 <div>
                   <label className="block text-white text-sm font-medium mb-2">Description</label>
                   <textarea
@@ -1344,7 +1369,17 @@ export default function Gyms() {
                     </div>
                   </div>
                 </div>
-                
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Credits Per Scan</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editingGym.creditsPerVisit ?? 1}
+                      onChange={e => setEditingGym({ ...editingGym, creditsPerVisit: Number(e.target.value) })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-[#B3FF13] focus:outline-none"
+                      required
+                    />
+                  </div>
                 <div>
                   <label className="block text-white text-sm font-medium mb-2">Description</label>
                   <textarea
@@ -1600,7 +1635,7 @@ export default function Gyms() {
                             <label className="flex items-center space-x-2 text-white text-sm">
                               <input
                                 type="checkbox"
-                                checked={!(editingGym.operatingHours?.male?.[day]?.closed ?? true)}
+                                checked={!editingGym.operatingHours?.male?.[day]?.closed}
                                 onChange={(e) => {
                                                                       const updatedMale = {
                                       monday: { open: "06:00", close: "22:00", closed: false },
@@ -1649,6 +1684,7 @@ export default function Gyms() {
                                         closed: false
                                       }
                                     }
+                                   
                                     setEditingGym({
                                       ...editingGym,
                                       operatingHours: {
@@ -1704,7 +1740,7 @@ export default function Gyms() {
                             <label className="flex items-center space-x-2 text-white text-sm">
                               <input
                                 type="checkbox"
-                                checked={!(editingGym.operatingHours?.female?.[day]?.closed ?? true)}
+                                checked={!editingGym.operatingHours?.female?.[day]?.closed}
                                 onChange={(e) => {
                                   const updatedFemale = {
                                     monday: { open: "06:00", close: "22:00", closed: false },

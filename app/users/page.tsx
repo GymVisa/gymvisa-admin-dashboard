@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore"
 import Sidebar from "@/components/Sidebar"
 import type { User } from "@/lib/types"
-import { Edit, Trash2, Plus, Mail, Phone, Calendar, Users as UsersIcon, Clipboard, Download, Snowflake, Building2 } from "lucide-react"
+import { Edit, Trash2, Plus, Mail, Phone, Calendar, Users as UsersIcon, Clipboard, Download, Snowflake, Building2, ArrowUpRight } from "lucide-react"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { updateDoc } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -33,6 +33,10 @@ export default function Users() {
   const [orgUsers, setOrgUsers] = useState([{ Name: '', Email: '', PhoneNo: '', Gender: '' }])
   const [orgResult, setOrgResult] = useState<Array<{ email: string; password: string }>>([])
   const [orgLoading, setOrgLoading] = useState(false)
+  const [creditDialogOpen, setCreditDialogOpen] = useState(false)
+  const [creditUser, setCreditUser] = useState<User | null>(null)
+  const [creditValue, setCreditValue] = useState<number>(0)
+  const [creditLoading, setCreditLoading] = useState(false)
   const GENDERS = ["Male", "Female", "Other"]
   
   function randomPassword(org?: string) {
@@ -352,6 +356,38 @@ export default function Users() {
     }
   }
 
+  // Add credits handler
+  const handleOpenCreditDialog = (user: User) => {
+    setCreditUser(user)
+    setCreditValue(user.credits ?? 0)
+    setCreditDialogOpen(true)
+  }
+
+  const handleCreditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCreditValue(Number(e.target.value))
+  }
+
+  const handleCreditSave = async () => {
+    if (!firebase?.db || !creditUser) return
+    setCreditLoading(true)
+    try {
+      const userRef = doc(firebase.db, "User", creditUser.UserID)
+      await updateDoc(userRef, { credits: creditValue })
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.UserID === creditUser.UserID ? { ...u, credits: creditValue } : u
+        )
+      )
+      setCreditDialogOpen(false)
+      setCreditUser(null)
+    } catch (error) {
+      alert("Failed to update credits")
+      console.error(error)
+    } finally {
+      setCreditLoading(false)
+    }
+  }
+
   if (!user) {
     return null
   }
@@ -404,6 +440,7 @@ export default function Users() {
                   <th className="px-4 py-4 text-left text-[#B3FF13] font-semibold min-w-[120px]">Subscription</th>
                   <th className="px-4 py-4 text-left text-[#B3FF13] font-semibold min-w-[120px]">End Date</th>
                   <th className="px-4 py-4 text-left text-[#B3FF13] font-semibold min-w-[100px]">Status</th>
+                  <th className="px-4 py-4 text-left text-[#B3FF13] font-semibold min-w-[100px]">Credits</th>
                   <th className="px-4 py-4 text-left text-[#B3FF13] font-semibold min-w-[120px]">Actions</th>
                 </tr>
               </thead>
@@ -454,6 +491,20 @@ export default function Users() {
                       }`}>
                         {user.isUserFreezed ? 'Frozen' : 'Active'}
                       </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center space-x-2">
+                        <span className="bg-gray-700 text-[#B3FF13] px-2 py-1 rounded text-sm font-medium">
+                          {user.credits ?? 0}
+                        </span>
+                        <button
+                          className="bg-[#B3FF13] text-black p-1 rounded hover:bg-[#9FE611] transition-colors"
+                          title="Edit Credits"
+                          onClick={() => handleOpenCreditDialog(user)}
+                        >
+                          <ArrowUpRight size={16} />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex space-x-2">
@@ -600,7 +651,7 @@ export default function Users() {
           </div>
         )}
       </div>
-      <Dialog open={addDialogOpen} onOpenChange={(open) => {
+      <Dialog open={addDialogOpen} onOpenChange={(open: any) => {
         setAddDialogOpen(open)
         if (!open) {
           resetForm()
@@ -801,6 +852,49 @@ export default function Users() {
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credits Dialog */}
+      <Dialog open={creditDialogOpen} onOpenChange={setCreditDialogOpen}>
+        <DialogContent className="bg-gray-900 max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Credits</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-white text-sm mb-1">User</label>
+              <div className="bg-gray-800 text-white px-3 py-2 rounded">{creditUser?.Name} ({creditUser?.Email})</div>
+            </div>
+            <div>
+              <label className="block text-white text-sm mb-1">Credits</label>
+              <input
+                type="number"
+                min={0}
+                value={creditValue}
+                onChange={handleCreditChange}
+                className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              onClick={handleCreditSave}
+              className="bg-[#B3FF13] text-black px-6 py-2 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors"
+              disabled={creditLoading}
+            >
+              {creditLoading ? "Saving..." : "Save"}
+            </button>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                onClick={() => setCreditDialogOpen(false)}
+              >
+                Cancel
+              </button>
+            </DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
