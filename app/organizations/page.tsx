@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import Sidebar from "@/components/Sidebar"
 import type { User } from "@/lib/types"
-import { Building2, Users, Mail, Phone, Calendar, Download, Search, Filter } from "lucide-react"
+import { Building2, Users, Mail, Phone, Calendar, Download, Search, Filter, Trash2, AlertTriangle } from "lucide-react"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -29,6 +29,10 @@ export default function Organizations() {
   const [selectedOrg, setSelectedOrg] = useState<OrganizationData | null>(null)
   const [orgDetailsOpen, setOrgDetailsOpen] = useState(false)
   const [hasFetched, setHasFetched] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [orgToDelete, setOrgToDelete] = useState<OrganizationData | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmText, setConfirmText] = useState("")
 
   useEffect(() => {
     if (initialized && !authLoading && !user) {
@@ -136,6 +140,56 @@ export default function Organizations() {
     setOrganizations([])
     fetchOrganizations()
   }
+
+  const handleDeleteOrganization = async () => {
+    if (!orgToDelete) return
+
+    setDeleting(true)
+    try {
+      console.log(`Deleting organization: ${orgToDelete.name}`)
+      
+      const response = await fetch("/api/delete-organization", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationName: orgToDelete.name,
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Delete response:", data);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete organization");
+      }
+
+      console.log("Organization deleted successfully:", data);
+      
+      // Close dialogs and refresh data
+      setDeleteConfirmOpen(false)
+      setOrgToDelete(null)
+      handleRefresh()
+      
+      // Show success message (you could add a toast notification here)
+      alert(`Organization "${orgToDelete.name}" and ${data.deletedUsers.length} users have been deleted successfully.`);
+      
+    } catch (error: any) {
+      console.error("Error deleting organization:", error);
+      alert(error.message || "Failed to delete organization");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const openDeleteConfirm = (org: OrganizationData) => {
+    setOrgToDelete(org)
+    setConfirmText("")
+    setDeleteConfirmOpen(true)
+  }
+
+  const isDeleteConfirmed = orgToDelete && confirmText === orgToDelete.name
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "N/A"
@@ -266,8 +320,16 @@ export default function Organizations() {
                   <button
                     onClick={() => downloadOrgCSV(org)}
                     className="bg-[#B3FF13] text-black px-3 py-2 rounded text-sm font-medium hover:bg-[#9FE611] transition-colors"
+                    title="Download CSV"
                   >
                     <Download size={14} className="inline" />
+                  </button>
+                  <button
+                    onClick={() => openDeleteConfirm(org)}
+                    className="bg-red-600 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-700 transition-colors"
+                    title="Delete Organization"
+                  >
+                    <Trash2 size={14} className="inline" />
                   </button>
                 </div>
               </div>
@@ -383,6 +445,106 @@ export default function Organizations() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="bg-gray-900 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-red-400">
+              <AlertTriangle size={24} className="mr-2" />
+              Delete Organization
+            </DialogTitle>
+          </DialogHeader>
+          
+          {orgToDelete && (
+            <div className="space-y-4">
+              <div className="bg-red-900/20 border border-red-600 p-4 rounded-lg">
+                <div className="flex items-start">
+                  <AlertTriangle size={20} className="text-red-400 mr-3 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-red-400 font-semibold mb-2">⚠️ IRREVERSIBLE ACTION</h4>
+                    <p className="text-red-300 text-sm">
+                      You are about to permanently delete the organization <strong>"{orgToDelete.name}"</strong> and ALL of its users.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-800 p-4 rounded-lg">
+                <h5 className="text-white font-semibold mb-3">What will be deleted:</h5>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Organization:</span>
+                    <span className="text-white font-medium">{orgToDelete.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Total Users:</span>
+                    <span className="text-white font-medium">{orgToDelete.totalUsers}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Active Users:</span>
+                    <span className="text-green-400 font-medium">{orgToDelete.activeUsers}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Frozen Users:</span>
+                    <span className="text-red-400 font-medium">{orgToDelete.frozenUsers}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-900/20 border border-yellow-600 p-3 rounded">
+                <p className="text-yellow-300 text-sm">
+                  <strong>⚠️ Warning:</strong> This action cannot be undone. All user accounts, data, and access will be permanently removed from the system.
+                </p>
+              </div>
+
+              <div className="bg-gray-800 p-3 rounded">
+                <p className="text-gray-300 text-sm">
+                  <strong>To confirm deletion, type the organization name:</strong>
+                </p>
+                <input
+                  type="text"
+                  placeholder={`Type "${orgToDelete.name}" to confirm`}
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  className="w-full mt-2 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-red-500 focus:outline-none"
+                  id="confirmInput"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex space-x-3">
+            <button
+              onClick={() => setDeleteConfirmOpen(false)}
+              className="flex-1 bg-gray-700 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors"
+              disabled={deleting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteOrganization}
+              className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={deleting || !isDeleteConfirmed}
+            >
+              {deleting ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={16} />
+                  <span>Delete Organization</span>
+                </>
+              )}
+            </button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

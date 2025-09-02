@@ -33,6 +33,8 @@ export default function Users() {
   const [orgUsers, setOrgUsers] = useState([{ Name: '', Email: '', PhoneNo: '', Gender: '' }])
   const [orgResult, setOrgResult] = useState<Array<{ email: string; password: string }>>([])
   const [orgLoading, setOrgLoading] = useState(false)
+  const [emailResults, setEmailResults] = useState<{ emailsSent: number; emailsFailed: number; emailErrors?: string[] } | null>(null)
+  const [orgErrors, setOrgErrors] = useState<string[]>([])
   const [creditDialogOpen, setCreditDialogOpen] = useState(false)
   const [creditUser, setCreditUser] = useState<User | null>(null)
   const [creditValue, setCreditValue] = useState<number>(0)
@@ -184,8 +186,10 @@ export default function Users() {
         throw new Error(data.error || "Failed to create organization users");
       }
 
-      console.log("Organization users created successfully:", data);
+      console.log("Organization users creation completed:", data);
       setOrgResult(data.results);
+      setEmailResults(data.emailResults || null);
+      setOrgErrors(data.errors || []);
       
       if (data.errors && data.errors.length > 0) {
         console.warn("Some users had errors:", data.errors);
@@ -227,6 +231,8 @@ export default function Users() {
     setOrgName('')
     setOrgUsers([{ Name: '', Email: '', PhoneNo: '', Gender: '' }])
     setOrgResult([])
+    setEmailResults(null)
+    setOrgErrors([])
     setResultsDialogOpen(false)
   }
 
@@ -724,7 +730,19 @@ export default function Users() {
               ))}
               <button type="button" className="bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-600 transition-colors mb-4" onClick={addOrgUser}><Plus size={16} className="inline mr-1" /> Add Another User</button>
               <DialogFooter>
-                <button type="submit" className="bg-[#B3FF13] text-black px-6 py-2 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors" disabled={orgLoading}>{orgLoading ? "Creating..." : "Create Users"}</button>
+                <button type="submit" className="bg-[#B3FF13] text-black px-6 py-2 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors" disabled={orgLoading}>
+                  {orgLoading ? (
+                    <div className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating Users & Sending Emails...
+                    </div>
+                  ) : (
+                    "Create Users"
+                  )}
+                </button>
               </DialogFooter>
             </form>
           )}
@@ -780,66 +798,152 @@ export default function Users() {
               </div>
             )}
             
-            {orgResult.length > 0 && (
+            {(orgResult.length > 0 || orgErrors.length > 0) && (
               <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                  <svg className="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {orgResult.length} Organization Users Created Successfully!
+                  {orgResult.length > 0 ? (
+                    <>
+                      <svg className="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {orgResult.length} Organization Users Created Successfully!
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      Organization User Creation Results
+                    </>
+                  )}
                 </h3>
-                <div className="space-y-4">
-                  <div className="bg-gray-700 p-3 rounded">
-                    <span className="text-gray-300">Organization: </span>
-                    <span className="text-white font-semibold">{orgName}</span>
+                
+                {/* Email Status Section */}
+                {emailResults && (
+                  <div className="mb-6 p-4 rounded-lg border border-gray-600">
+                    <h4 className="text-lg font-semibold text-white mb-3 flex items-center">
+                      <svg className="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Email Status
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div className="bg-green-900/30 border border-green-600 p-3 rounded">
+                        <div className="text-green-400 font-semibold text-sm">Emails Sent</div>
+                        <div className="text-white text-xl font-bold">{emailResults.emailsSent}</div>
+                      </div>
+                      <div className={`border p-3 rounded ${emailResults.emailsFailed > 0 ? 'bg-red-900/30 border-red-600' : 'bg-gray-700 border-gray-600'}`}>
+                        <div className={`font-semibold text-sm ${emailResults.emailsFailed > 0 ? 'text-red-400' : 'text-gray-400'}`}>Emails Failed</div>
+                        <div className={`text-xl font-bold ${emailResults.emailsFailed > 0 ? 'text-red-300' : 'text-gray-300'}`}>{emailResults.emailsFailed}</div>
+                      </div>
+                    </div>
+                    {emailResults.emailErrors && emailResults.emailErrors.length > 0 && (
+                      <div className="bg-red-900/20 border border-red-600 p-3 rounded">
+                        <div className="text-red-400 font-semibold text-sm mb-2">Email Errors:</div>
+                        <div className="text-red-300 text-sm space-y-1">
+                          {emailResults.emailErrors.map((error, index) => (
+                            <div key={index} className="flex items-start">
+                              <span className="text-red-400 mr-2">•</span>
+                              <span>{error}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {emailResults.emailsSent > 0 && (
+                      <div className="mt-3 p-3 bg-blue-900/20 border border-blue-600 rounded">
+                        <div className="text-blue-400 text-sm">
+                          <strong>✅ Credentials have been sent to {emailResults.emailsSent} user{emailResults.emailsSent > 1 ? 's' : ''}!</strong>
+                          <br />
+                          Each user will receive their login credentials via email with instructions to download and use the GymVisa app.
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  
-                  <div className="max-h-60 overflow-y-auto">
+                )}
+                
+                {/* Error Display Section */}
+                {orgErrors.length > 0 && (
+                  <div className="mb-6 p-4 rounded-lg border border-red-600 bg-red-900/20">
+                    <h4 className="text-lg font-semibold text-red-400 mb-3 flex items-center">
+                      <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      User Creation Errors ({orgErrors.length})
+                    </h4>
                     <div className="space-y-2">
-                      {orgResult.map((user, index) => (
-                        <div key={index} className="bg-gray-600 p-3 rounded flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="text-white font-semibold">User {index + 1}</div>
-                            <div className="text-gray-300 text-sm">{user.email}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-white font-mono text-sm">{user.password}</div>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${user.email} / ${user.password}`);
-                                alert("Credentials copied to clipboard!");
-                              }}
-                              className="text-[#B3FF13] hover:text-[#9FE611] text-xs"
-                            >
-                              Copy
-                            </button>
-                          </div>
+                      {orgErrors.map((error, index) => (
+                        <div key={index} className="bg-red-800/30 border border-red-600 p-3 rounded flex items-start">
+                          <svg className="w-4 h-4 text-red-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          <span className="text-red-300 text-sm">{error}</span>
                         </div>
                       ))}
                     </div>
+                    <div className="mt-3 p-3 bg-yellow-900/20 border border-yellow-600 rounded">
+                      <div className="text-yellow-400 text-sm">
+                        <strong>💡 Tip:</strong> Users that already exist in the system cannot be created again. 
+                        You can check the existing users list or try with different email addresses.
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={downloadXLS}
-                      className="flex-1 bg-[#B3FF13] text-black px-4 py-3 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors flex items-center justify-center"
-                    >
-                      <Download size={16} className="mr-2" />
-                      Download CSV
-                    </button>
-                    <button
-                      onClick={() => {
-                        const allCredentials = orgResult.map(r => `${r.email} / ${r.password}`).join('\n');
-                        navigator.clipboard.writeText(allCredentials);
-                        alert("All credentials copied to clipboard!");
-                      }}
-                      className="flex-1 bg-gray-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-gray-500 transition-colors flex items-center justify-center"
-                    >
-                      <Clipboard size={16} className="mr-2" />
-                      Copy All
-                    </button>
+                )}
+                
+                {orgResult.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="bg-gray-700 p-3 rounded">
+                      <span className="text-gray-300">Organization: </span>
+                      <span className="text-white font-semibold">{orgName}</span>
+                    </div>
+                    
+                    <div className="max-h-60 overflow-y-auto">
+                      <div className="space-y-2">
+                        {orgResult.map((user, index) => (
+                          <div key={index} className="bg-gray-600 p-3 rounded flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="text-white font-semibold">User {index + 1}</div>
+                              <div className="text-gray-300 text-sm">{user.email}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-white font-mono text-sm">{user.password}</div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${user.email} / ${user.password}`);
+                                  alert("Credentials copied to clipboard!");
+                                }}
+                                className="text-[#B3FF13] hover:text-[#9FE611] text-xs"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={downloadXLS}
+                        className="flex-1 bg-[#B3FF13] text-black px-4 py-3 rounded-lg font-semibold hover:bg-[#9FE611] transition-colors flex items-center justify-center"
+                      >
+                        <Download size={16} className="mr-2" />
+                        Download CSV
+                      </button>
+                      <button
+                        onClick={() => {
+                          const allCredentials = orgResult.map(r => `${r.email} / ${r.password}`).join('\n');
+                          navigator.clipboard.writeText(allCredentials);
+                          alert("All credentials copied to clipboard!");
+                        }}
+                        className="flex-1 bg-gray-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-gray-500 transition-colors flex items-center justify-center"
+                      >
+                        <Clipboard size={16} className="mr-2" />
+                        Copy All
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
             
