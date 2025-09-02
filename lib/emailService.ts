@@ -134,10 +134,13 @@ const generateEmailHTML = (credentials: EmailCredentials) => {
                 border-radius: 8px;
                 border: 1px solid #333333;
             }
+            .download-section h3 {
+                color: #333333;
+            }
             .download-button {
                 display: inline-block;
                 background-color: #B3FF13;
-                color: #000000;
+                color: #ffffff;
                 padding: 12px 30px;
                 text-decoration: none;
                 border-radius: 25px;
@@ -186,7 +189,7 @@ const generateEmailHTML = (credentials: EmailCredentials) => {
     <body>
         <div class="container">
             <div class="header">
-                <div class="logo">🏋️ GymVisa</div>
+                <div class="logo">🏋️ Gym Visa</div>
                 <div class="welcome">Welcome to the GymVisa Community!</div>
             </div>
 
@@ -221,7 +224,6 @@ const generateEmailHTML = (credentials: EmailCredentials) => {
             </div>
 
             <div class="download-section">
-                <h3>📲 Download GymVisa App</h3>
                 <p>Get the GymVisa app on your mobile device to start your fitness journey!</p>
                 <a href="https://play.google.com/store/apps/details?id=com.gymvisa.app&pcampaignid=web_share" class="download-button">Download for iOS</a>
                 <a href="https://apps.apple.com/pk/app/gym-visa/id6743032385" class="download-button">Download for Android</a>
@@ -235,7 +237,7 @@ const generateEmailHTML = (credentials: EmailCredentials) => {
 
             <div class="footer">
                 <p>If you have any questions or need assistance, please contact your organization administrator or our support team.</p>
-                <p><strong>Welcome to GymVisa - Your Fitness Journey Starts Here! 🚀</strong></p>
+                <p><strong>Welcome to Gym Visa - Your Fitness Journey Starts Here! 🚀</strong></p>
             </div>
         </div>
     </body>
